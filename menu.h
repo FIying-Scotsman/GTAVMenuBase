@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef NATIVEMENU_EXPORTS  
+#define NATIVEMENULIB_API __declspec(dllexport)   
+#else  
+#define NATIVEMENULIB_API __declspec(dllimport)   
+#endif  
+
 /*
  * Menu system that was originally from sudomod, but with a bunch of
  * changes to make working with it easier.
@@ -18,7 +24,7 @@
 
 // TODO: menuutils.h for string utils
 namespace NativeMenu {
-class Menu {
+class NATIVEMENULIB_API Menu {
 public:
 	/*
 	 * c'tor and d'tor. As of current they don't do a lot.
