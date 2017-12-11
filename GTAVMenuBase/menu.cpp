@@ -8,19 +8,19 @@
 #include "menucontrols.h"
 #include "menuutils.h"
 #include <locale>
+#include "Scaleform.h"
+#include "InstructionalButton.h"
 
 // TODO: Fixes:
-//		- Reduce code duplication (titles, OptionPlus title)
-//		- OptionPlus title scaling/chopping
-//		- OptionPlus line chopping
-//		- Handle long menu names
-//		- Handle Chalet London scaling
-//		- Check FloatArray refactoring possibilities
+//      - Reduce code duplication (titles, OptionPlus title)
+//      - Handle Chalet London scaling
 
 // TODO: Improvements:
-//		- Mouse support
-//		- Badges?
-//		- Support longer lists by removing radar
+//      - Mouse support
+//      - Badges?
+
+// TODO: Never:
+//      - Re-write to OO
 
 namespace NativeMenu {
 
@@ -140,21 +140,41 @@ void Menu::Title(std::string title, int textureHandle, float customSize) {
 
 	float safeZone = GRAPHICS::GET_SAFE_ZONE_SIZE();
 	float safeOffset = (1.0f - safeZone) * 0.5f;
+    float safeOffsetX = safeOffset;
+
+    float titleX = menuX;
+    float ar = GRAPHICS::_GET_ASPECT_RATIO(FALSE);
+    float ar_true = GRAPHICS::_GET_ASPECT_RATIO(TRUE);
+
+    // game allows max 16/9 ratio for UI elements
+    if (ar > 16.0f / 9.0f) {
+        titleX += (ar - 16.0f / 9.0f) / (2.0f * ar);
+    }
+
+    float drawWidth = menuWidth;
+    // handle multi-monitor setups
+    if (ar_true > ar) {
+        if (ar > 16.0f / 9.0f) {
+            titleX -= (ar - 16.0f / 9.0f) / (2.0f * ar);
+        }
+
+        titleX /= ar_true / ar;
+        titleX += ar / ar_true;
+
+        drawWidth *= ar / ar_true;
+        safeOffsetX *= ar / ar_true;
+    }
 
 	// We don't worry about depth since SHV draws these on top of the game anyway
 	drawTexture(textureHandle, 0, -9999, 60,									 // handle, index, depth, time
-		menuWidth, titleHeight / GRAPHICS::_GET_ASPECT_RATIO(FALSE), 0.5f, 0.5f, // width, height, origin x, origin y
-		menuX + safeOffset, titley + safeOffset, 0.0f, GRAPHICS::_GET_ASPECT_RATIO(FALSE), 1.0f, 1.0f, 1.0f, 1.0f);
+        drawWidth, titleHeight / GRAPHICS::_GET_ASPECT_RATIO(FALSE), 0.5f, 0.5f, // width, height, origin x, origin y
+		titleX + safeOffsetX, titley + safeOffset, 0.0f, GRAPHICS::_GET_ASPECT_RATIO(FALSE), 1.0f, 1.0f, 1.0f, 1.0f);
 	
-
 	totalHeight = titleHeight;
 	headerHeight = titleHeight;
 }
 
-void Menu::Subtitle(std::string subtitle, bool allcaps) {
-	if (allcaps)
-		subtitle = makeCaps(subtitle);
-	
+void Menu::Subtitle(std::string subtitle) {	
 	float subtitleY = subtitleTextureOffset + menuY + totalHeight;
 	float subtitleTextY = menuY + totalHeight;
 	textDraws.push_back(
@@ -182,48 +202,64 @@ void Menu::Footer(std::string dict, std::string texture) {
 }
 
 bool Menu::Option(std::string option, std::vector<std::string> details) {
-	optioncount++;
+    return Option(option, optionsBackgroundSelectColor, details);
+}
 
-	bool highlighted = currentoption == optioncount;
-	
+bool Menu::Option(std::string option, Color highlight, std::vector<std::string> details) {
+    optioncount++;
 
-	bool visible = false;
-	float optiony;
-	float optiontexty;
+    bool highlighted = currentoption == optioncount;
 
-	if (currentoption <= maxDisplay && optioncount <= maxDisplay) {
-		visible = true;
-		optiontexty = menuY + totalHeight;
-		optiony = optiontexty + optionTextureOffset;
-	}
-	else if (optioncount > currentoption - maxDisplay && optioncount <= currentoption) {
-		visible = true;
-		optiontexty = menuY + headerHeight + (optioncount - (currentoption - maxDisplay + 1)) * optionHeight;
-		optiony = optiontexty + optionTextureOffset;
-	}
 
-	if (visible) {
-		textDraws.push_back(
-			std::bind(&Menu::drawText, this, 
-			option, optionsFont, (menuX - menuWidth / 2.0f) + menuTextMargin, optiontexty, optionTextSize, optionTextSize, highlighted ? optionsTextSelectColor : optionsTextColor, 1
-			)
-		);
+    bool visible = false;
+    float optiony;
+    float optiontexty;
 
-		if (highlighted) {
-			highlightsSpriteDraws.push_back(
-				std::bind(&Menu::drawSprite, this, textureDicts[highlTextureIndex], textureNames[highlTextureIndex],
-				menuX, optiony, menuWidth, optionHeight, 0.0f, optionsBackgroundSelectColor)
-			);
-			
-			if (details.size() > 0) {
-				this->details = details;
-			}
-		}
-	}
-	
-	totalHeight += optionHeight;
-	if (optionpress && currentoption == optioncount) return true;
-	return false;
+    if (currentoption <= maxDisplay && optioncount <= maxDisplay) {
+        visible = true;
+        optiontexty = menuY + totalHeight;
+        optiony = optiontexty + optionTextureOffset;
+    }
+    else if (optioncount > currentoption - maxDisplay && optioncount <= currentoption) {
+        visible = true;
+        optiontexty = menuY + headerHeight + (optioncount - (currentoption - maxDisplay + 1)) * optionHeight;
+        optiony = optiontexty + optionTextureOffset;
+    }
+
+    if (visible) {
+        const float big_ass_Chalet_London_mult = optionsFont == 0 ? 0.75f : 1.0f;
+        bool appendDots = false;
+        while (getStringWidth(option, optionTextSize * big_ass_Chalet_London_mult, optionsFont) > (menuWidth - 2.0f*menuTextMargin)) {
+            option.pop_back();
+            appendDots = true;
+        }
+        if (appendDots) {
+            option.pop_back();
+            option.pop_back();
+            option.pop_back();
+            option += "...";
+        }
+        textDraws.push_back(
+            std::bind(&Menu::drawText, this,
+                option, optionsFont, (menuX - menuWidth / 2.0f) + menuTextMargin, optiontexty, optionTextSize, optionTextSize, highlighted ? optionsTextSelectColor : optionsTextColor, 1
+            )
+        );
+
+        if (highlighted) {
+            highlightsSpriteDraws.push_back(
+                std::bind(&Menu::drawSprite, this, textureDicts[highlTextureIndex], textureNames[highlTextureIndex],
+                    menuX, optiony, menuWidth, optionHeight, 0.0f, highlight)
+            );
+
+            if (details.size() > 0) {
+                this->details = details;
+            }
+        }
+    }
+
+    totalHeight += optionHeight;
+    if (optionpress && currentoption == optioncount) return true;
+    return false;
 }
 
 bool Menu::MenuOption(std::string option, std::string menu, std::vector<std::string> details) {
@@ -260,34 +296,6 @@ bool Menu::MenuOption(std::string option, std::string menu, std::vector<std::str
 	return false;
 }
 
-bool Menu::OptionPlus(std::string option, std::vector<std::string> &extra,
-					  std::function<void() > onRight, std::function<void() > onLeft, 
-					  std::string title, std::vector<std::string> details) {
-	Option(option, details);
-	size_t infoLines = extra.size();
-	bool highlighted = currentoption == optioncount;
-	if (currentoption == optioncount) {
-		if (onLeft && leftpress) {
-			onLeft();
-			leftpress = false;
-			return false;
-		}
-		if (onRight && rightpress) {
-			onRight();
-			rightpress = false;
-			return false;
-		}
-	}
-
-	if (highlighted && ((currentoption <= maxDisplay && optioncount <= maxDisplay) ||
-		((optioncount > (currentoption - maxDisplay)) && optioncount <= currentoption))) {
-		drawAdditionalInfoBox(extra, infoLines, title);
-	}
-
-	if (optionpress && currentoption == optioncount) return true;
-	return false;
-}
-
 bool Menu::OptionPlus(std::string option, std::vector<std::string> &extra, bool *_highlighted,
 					  std::function<void() > onRight, std::function<void() > onLeft,
 					  std::string title, std::vector<std::string> details) {
@@ -295,7 +303,7 @@ bool Menu::OptionPlus(std::string option, std::vector<std::string> &extra, bool 
 	size_t infoLines = extra.size();
 	bool highlighted = currentoption == optioncount;
 	if (_highlighted != nullptr) {
-		*_highlighted = currentoption == optioncount;
+		*_highlighted = highlighted;
 	}
 
 	if (currentoption == optioncount) {
@@ -311,13 +319,18 @@ bool Menu::OptionPlus(std::string option, std::vector<std::string> &extra, bool 
 		}
 	}
 
-	if (highlighted && ((currentoption <= maxDisplay && optioncount <= maxDisplay) ||
+	if (highlighted && infoLines > 0 && 
+		((currentoption <= maxDisplay && optioncount <= maxDisplay) ||
 		((optioncount > (currentoption - maxDisplay)) && optioncount <= currentoption))) {
-		drawAdditionalInfoBox(extra, infoLines, title);
+		drawOptionPlusExtras(extra, title);
 	}
 
 	if (optionpress && currentoption == optioncount) return true;
 	return false;
+}
+
+void Menu::OptionPlusPlus(std::vector<std::string> &extra, std::string title) {
+	drawOptionPlusExtras(extra, title);
 }
 
 bool Menu::IntOption(std::string option, int &var, int min, int max, int step, std::vector<std::string> details) {
@@ -576,6 +589,29 @@ void Menu::EndMenu() {
 	textDraws.clear();
 	details.clear();
 	footerType = FooterType::Default;
+
+    std::vector<InstructionalButton> instructionalButtons;
+    Scaleform instructionalButtonsScaleform("instructional_buttons");
+
+    instructionalButtonsScaleform.CallFunction("CLEAR_ALL");
+    instructionalButtonsScaleform.CallFunction("TOGGLE_MOUSE_BUTTONS", { 0 });
+    instructionalButtonsScaleform.CallFunction("CREATE_CONTAINER");
+    instructionalButtonsScaleform.CallFunction("SET_DATA_SLOT", { 0, std::string(CONTROLS::GET_CONTROL_INSTRUCTIONAL_BUTTON(2, ControlPhoneSelect, 0)), std::string(UI::_GET_LABEL_TEXT("HUD_INPUT2")) });
+    instructionalButtonsScaleform.CallFunction("SET_DATA_SLOT", { 1, std::string(CONTROLS::GET_CONTROL_INSTRUCTIONAL_BUTTON(2, ControlPhoneCancel, 0)), std::string(UI::_GET_LABEL_TEXT("HUD_INPUT3")) });
+    instructionalButtonsScaleform.CallFunction("SET_DATA_SLOT", { 2, std::string(CONTROLS::GET_CONTROL_INSTRUCTIONAL_BUTTON(2, ControlPhoneUp, 0)), std::string("Up") });
+    instructionalButtonsScaleform.CallFunction("SET_DATA_SLOT", { 3, std::string(CONTROLS::GET_CONTROL_INSTRUCTIONAL_BUTTON(2, ControlPhoneDown, 0)), std::string("Down") });
+
+    //int count = 2;
+    //for (auto button : instructionalButtons) {
+    //    if (button.ItemBind == null || MenuItems[CurrentSelection] == button.ItemBind) {
+    //        instructionalButtonsScaleform.CallFunction("SET_DATA_SLOT", { count, button.GetButtonId(), button.Text });
+    //        count++;
+    //    }
+    //}
+
+    instructionalButtonsScaleform.CallFunction("DRAW_INSTRUCTIONAL_BUTTONS", { -1 });
+    instructionalButtonsScaleform.Render2D();
+
 	disableKeys();
 
 	if (currentoption > optioncount) currentoption = optioncount;
@@ -583,13 +619,18 @@ void Menu::EndMenu() {
 }
 
 void Menu::CheckKeys() {
+    if (cheatString != "") {
+        if (GAMEPLAY::_HAS_CHEAT_STRING_JUST_BEEN_ENTERED(GAMEPLAY::GET_HASH_KEY((char*)cheatString.c_str()))) {
+            OpenMenu();
+        }
+    }
 	controls.Update();
 	optionpress = false;
 
 	if (GetTickCount() - delay > menuTime ||
 		controls.IsKeyJustPressed(MenuControls::MenuKey) ||
-		controls.IsKeyJustPressed(MenuControls::MenuSelect) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlFrontendAccept) ||
-		controls.IsKeyJustPressed(MenuControls::MenuCancel) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlFrontendCancel) ||
+		controls.IsKeyJustPressed(MenuControls::MenuSelect) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlPhoneSelect) ||
+		controls.IsKeyJustPressed(MenuControls::MenuCancel) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlPhoneCancel) ||
 		controls.IsKeyJustPressed(MenuControls::MenuUp) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlFrontendUp) ||
 		controls.IsKeyJustPressed(MenuControls::MenuDown) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlFrontendDown) ||
 		controls.IsKeyJustPressed(MenuControls::MenuLeft) || useNative && CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, ControlPhoneLeft) ||
@@ -605,8 +646,8 @@ void Menu::CheckKeys() {
 		controls.IsKeyJustReleased(MenuControls::MenuDown) || controls.IsKeyJustPressed(MenuControls::MenuDown) ||
 		controls.IsKeyJustReleased(MenuControls::MenuLeft) || controls.IsKeyJustPressed(MenuControls::MenuLeft) ||
 		controls.IsKeyJustReleased(MenuControls::MenuRight) || controls.IsKeyJustPressed(MenuControls::MenuRight) ||
-		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlFrontendAccept) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlFrontendAccept) ||
-		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlFrontendCancel) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlFrontendCancel) ||
+		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlPhoneSelect) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlPhoneSelect) ||
+		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlPhoneCancel) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlPhoneCancel) ||
 		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlFrontendUp) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlFrontendUp) ||
 		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlFrontendDown) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlFrontendDown) ||
 		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, ControlPhoneLeft) || CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, ControlPhoneLeft) ||
@@ -630,6 +671,16 @@ void Menu::CheckKeys() {
 
 }
 
+void Menu::OpenMenu() {
+	if (menulevel == 0) {
+		changeMenu("mainmenu");
+		updateScreenSize();
+		if (onMain) {
+			onMain();
+		}
+	}
+}
+
 void Menu::CloseMenu() {
 	while (menulevel > 0) {
 		backMenu();
@@ -641,9 +692,17 @@ const MenuControls &Menu::GetControls() {
 	return controls;
 }
 
+bool Menu::IsThisOpen() {
+    return menulevel > 0;
+}
+
 float Menu::getStringWidth(std::string text, float scale, int font) {
 	UI::_BEGIN_TEXT_COMMAND_WIDTH("STRING");
+<<<<<<< HEAD:GTAVMenuBase/menu.cpp
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(CharAdapter(text));
+=======
+	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME((char *)text.c_str());
+>>>>>>> upstream/master:menu.cpp
 	UI::SET_TEXT_FONT( font);
 	UI::SET_TEXT_SCALE( scale, scale);
 	return UI::_END_TEXT_COMMAND_GET_WIDTH(true);
@@ -687,7 +746,7 @@ void Menu::drawText(const std::string text, int font, float x, float y, float pU
 	UI::SET_TEXT_SCALE(0.0f, scale);
 	UI::SET_TEXT_COLOUR(color.R, color.G, color.B, color.A);
 	UI::BEGIN_TEXT_COMMAND_DISPLAY_TEXT("STRING");
-	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(CharAdapter(text));
+	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME((char *)text.c_str());
 	UI::END_TEXT_COMMAND_DISPLAY_TEXT(x, y);
 }
 
@@ -696,18 +755,25 @@ void Menu::drawRect(float x, float y, float width, float height, Color color) {
 }
 
 void Menu::drawSprite(std::string textureDict, std::string textureName, float x, float y, float width, float height, float rotation, Color color) {
-	if (!GRAPHICS::HAS_STREAMED_TEXTURE_DICT_LOADED(CharAdapter(textureDict))) GRAPHICS::REQUEST_STREAMED_TEXTURE_DICT(CharAdapter(textureDict), false);
-	else GRAPHICS::DRAW_SPRITE(CharAdapter(textureDict), CharAdapter(textureName), x, y, width, height, rotation, color.R, color.G, color.B, color.A);
+	if (!GRAPHICS::HAS_STREAMED_TEXTURE_DICT_LOADED((char *)textureDict.c_str())) {
+		GRAPHICS::REQUEST_STREAMED_TEXTURE_DICT((char *)textureDict.c_str(), false);
+	}
+	else {
+		GRAPHICS::DRAW_SPRITE((char *)textureDict.c_str(), (char *)textureName.c_str(), x, y, width, height, rotation, color.R, color.G, color.B, color.A);
+	}
 }
 
-void Menu::drawAdditionalInfoBoxTitle(std::string title) {
+void Menu::drawOptionPlusTitle(std::string title) {
+    float newSize;
+    fitTitle(title, newSize, titleTextSize);
+
 	float extrax = menuX + menuWidth;
 
 	float titletexty = menuY + titleTextOffset;
 	float titley = menuY + titleTextureOffset;
 
 	textDraws.push_back(
-		std::bind(&Menu::drawText, this, title, titleFont, extrax, titletexty, titleTextSize, titleTextSize, titleTextColor, 0)
+		std::bind(&Menu::drawText, this, title, titleFont, extrax, titletexty, newSize, newSize, titleTextColor, 0)
 	);
 
 	backgroundSpriteDraws.push_back(
@@ -717,9 +783,107 @@ void Menu::drawAdditionalInfoBoxTitle(std::string title) {
 	
 }
 
-void Menu::drawAdditionalInfoBox(std::vector<std::string> &extra, size_t infoLines, std::string title) {
+void Menu::drawOptionPlusImage(std::string &extra, float &finalHeight) {
+    int imgHandle;
+    int imgWidth; 
+    int imgHeight;
+    std::string scanFormat = ImagePrefix + "%dW%dH%d";
+    int nParams = sscanf_s(extra.c_str(), scanFormat.c_str(), &imgHandle, &imgWidth, &imgHeight);
+    if (nParams != 3) {
+        std::string errTxt = "Format error: " + extra;
+        textDraws.push_back(
+            std::bind(&Menu::drawText, this,
+                      errTxt, optionsFont, menuX + menuWidth / 2.0f + menuTextMargin, finalHeight + (menuY + headerHeight), optionTextSize, optionTextSize, optionsTextColor, 1));
+        finalHeight += optionHeight;
+        return;
+    }
+    float drawWidth = menuWidth - 2.0f * menuTextMargin;
+    float drawHeight = (float)imgHeight * (drawWidth / (float)imgWidth);
+    float imgXpos = (menuX + menuWidth / 2.0f + menuTextMargin);
+    float imgYpos = finalHeight + (menuY + headerHeight) + menuTextMargin;
+
+    float safeZone = GRAPHICS::GET_SAFE_ZONE_SIZE();
+    float safeOffset = (1.0f - safeZone) * 0.5f;
+    float safeOffsetX = safeOffset;
+
+    float ar = GRAPHICS::_GET_ASPECT_RATIO(FALSE);
+
+    // game allows max 16/9 ratio for UI elements
+    if (ar > 16.0f / 9.0f) {
+        imgXpos += (ar - 16.0f / 9.0f) / (2.0f * ar);
+    }
+
+
+    // handle multi-monitor setups
+    float ar_true = GRAPHICS::_GET_ASPECT_RATIO(TRUE);
+    if (ar_true > ar) {
+        if (ar > 16.0f / 9.0f) {
+            imgXpos -= (ar - 16.0f / 9.0f) / (2.0f * ar);
+        }
+
+        imgXpos /= ar_true / ar;
+        imgXpos += ar/ar_true;
+
+        drawWidth *= ar / ar_true;
+        safeOffsetX *= ar / ar_true;
+    }
+
+    drawTexture(imgHandle, 0, -9999, 60,                            // handle, index, depth, time
+                drawWidth, drawHeight, 0.0f, 0.0f,                  // width, height, origin x, origin y
+                imgXpos + safeOffsetX, imgYpos + safeOffset, 0.0f,   // pos x, pos y, rot
+                ar, 1.0f, 1.0f, 1.0f, 1.0f);                        // screen correct, rgba
+    finalHeight += drawHeight * ar + 2.0f * menuTextMargin;
+}
+
+void Menu::drawOptionPlusSprite(std::string &extra, float &finalHeight) {
+    const unsigned max_sz = 128;
+    char dict[max_sz];
+    char name[max_sz];
+    int imgWidth;
+    int imgHeight;
+    std::string scanFormat = SpritePrefix + "%s %s W%dH%d";
+    int nParams = sscanf_s(extra.c_str(), scanFormat.c_str(), dict, max_sz, name, max_sz, &imgWidth, &imgHeight);
+    if (nParams != 4) {
+        std::string errTxt = "Format error: " + extra;
+        textDraws.push_back(
+            std::bind(&Menu::drawText, this,
+                      errTxt, optionsFont, menuX + menuWidth / 2.0f + menuTextMargin, finalHeight + (menuY + headerHeight), optionTextSize, optionTextSize, optionsTextColor, 1));
+        finalHeight += optionHeight;
+        return;
+    }
+    float drawWidth = menuWidth - 2.0f * menuTextMargin;
+    float drawHeight = (float)imgHeight * (drawWidth / (float)imgWidth) * GRAPHICS::_GET_ASPECT_RATIO(FALSE);
+    float imgXpos = menuX + menuWidth / 2.0f + drawWidth / 2.0f + menuTextMargin;
+    float imgYpos = finalHeight + drawHeight/2.0f + (menuY + headerHeight) + menuTextMargin;
+			
+    foregroundSpriteCalls.push_back(
+        std::bind(&Menu::drawSprite, this, std::string(dict), std::string(name),
+                  imgXpos, imgYpos, drawWidth, drawHeight, 0.0f, titleTextColor)
+    );
+			
+    finalHeight += drawHeight + 2.0f * menuTextMargin;
+}
+
+void Menu::drawOptionPlusText(std::string &extra, float &finalHeight) {
+    std::vector<std::string> splitExtra;
+    const float big_ass_Chalet_London_mult = optionsFont == 0 ? 0.75f : 1.0f;
+    auto splitLines = splitString(menuWidth, extra, optionTextSize * big_ass_Chalet_London_mult, optionsFont);
+    splitExtra.insert(std::end(splitExtra), std::begin(splitLines), std::end(splitLines));
+
+    for (auto line = 0; line < splitExtra.size(); line++) {
+        textDraws.push_back(
+            std::bind(&Menu::drawText, this,
+                      splitExtra[line], optionsFont, 
+                      menuX + menuWidth / 2.0f + menuTextMargin, finalHeight + (menuY + headerHeight) + line * optionHeight, 
+                      optionTextSize, optionTextSize, 
+                      optionsTextColor, 1));
+    }
+    finalHeight += splitExtra.size() * optionHeight;
+}
+
+void Menu::drawOptionPlusExtras(std::vector<std::string> &extras, std::string title) {
 	float extrax = menuX + menuWidth;
-	drawAdditionalInfoBoxTitle(title);
+	drawOptionPlusTitle(title);
 
 	if (headerHeight == titleHeight + subtitleHeight) {
 		float subtitleY = subtitleTextureOffset + menuY + titleHeight;
@@ -730,54 +894,27 @@ void Menu::drawAdditionalInfoBox(std::vector<std::string> &extra, size_t infoLin
 
 	float finalHeight = 0;
 
-	for (int i = 0; i < infoLines; i++) {
-		if (!extra[i].compare(0, ImagePrefix.size(), ImagePrefix)) {
-			int imgHandle;
-			int imgWidth; 
-			int imgHeight;
-			std::string scanFormat = ImagePrefix + "%dW%dH%d";
-			int nParams = sscanf_s(extra[i].c_str(), scanFormat.c_str(), &imgHandle, &imgWidth, &imgHeight);
-			if (nParams != 3) {
-				std::string errTxt = "Format error: " + extra[i];
-				textDraws.push_back(
-					std::bind(&Menu::drawText, this,
-					errTxt, optionsFont, menuX + menuWidth / 2.0f + menuTextMargin, finalHeight + (menuY + headerHeight), optionTextSize, optionTextSize, optionsTextColor, 1));
-				finalHeight += optionHeight;
-				continue;
-			}
-			float drawWidth = menuWidth - 2.0f * menuTextMargin;
-			float drawHeight = (float)imgHeight * (drawWidth / (float)imgWidth);
-			float imgAspect = GRAPHICS::_GET_ASPECT_RATIO(FALSE);
-			float imgXpos = menuX + menuWidth / 2.0f + menuTextMargin;
-			float imgYpos = finalHeight + (menuY + headerHeight) + menuTextMargin * imgAspect;
-
-
-			float safeZone = GRAPHICS::GET_SAFE_ZONE_SIZE();
-			float safeOffset = (1.0f - safeZone) * 0.5f;
-
-			drawTexture(imgHandle, 0, -9999, 60,											// handle, index, depth, time
-						drawWidth, drawHeight, 0.0f, 0.0f,									// width, height, origin x, origin y
-						imgXpos + safeOffset, imgYpos + safeOffset, 0.0f,												// pos x, pos y, rot
-						imgAspect, 1.0f, 1.0f, 1.0f, 1.0f);		// screen correct, rgba
-			finalHeight += (drawHeight + 2.0f * menuTextMargin) * imgAspect;
+	for (auto extra : extras) {
+		if (extra.compare(0, ImagePrefix.size(), ImagePrefix) == 0) {
+            drawOptionPlusImage(extra, finalHeight);
+		}
+		else if (extra.compare(0, SpritePrefix.size(), SpritePrefix) == 0) {
+			drawOptionPlusSprite(extra, finalHeight);
 		}
 		else {
-			textDraws.push_back(
-				std::bind(&Menu::drawText, this,
-				extra[i], optionsFont, menuX + menuWidth / 2.0f + menuTextMargin, finalHeight + (menuY + headerHeight), optionTextSize, optionTextSize, optionsTextColor, 1));
-			finalHeight += optionHeight;
+			drawOptionPlusText(extra, finalHeight);
 		}
 	}
 
 	backgroundSpriteDraws.push_back(
 		std::bind(&Menu::drawSprite, this, textureDicts[backgTextureIndex], textureNames[backgTextureIndex],
-		extrax, (menuY + headerHeight) + (finalHeight) / 2, menuWidth, finalHeight, 0.0f, optionsBackgroundColor)
+		extrax, menuY + headerHeight + finalHeight / 2.0f, menuWidth, finalHeight, 0.0f, optionsBackgroundColor)
 	);
 }
 
 void Menu::drawMenuDetails(std::vector<std::string> details, float y) {
 	std::vector<std::string> splitDetails;
-	float big_ass_Chalet_London_mult = optionsFont == 0 ? 0.75f : 1.0f;
+    const float big_ass_Chalet_London_mult = optionsFont == 0 ? 0.75f : 1.0f;
 	for (auto detailLine : details) {
 		auto splitLines = splitString(menuWidth, detailLine, optionTextSize * big_ass_Chalet_London_mult, optionsFont);
 		splitDetails.insert(std::end(splitDetails), std::begin(splitLines), std::end(splitLines));
@@ -903,70 +1040,23 @@ void Menu::disableKeys() {
 	disableKeysOnce();
 
 	UI::HIDE_HELP_TEXT_THIS_FRAME();
-	UI::HIDE_HUD_COMPONENT_THIS_FRAME(10);
-	UI::HIDE_HUD_COMPONENT_THIS_FRAME(6);
-	UI::HIDE_HUD_COMPONENT_THIS_FRAME(7);
-	UI::HIDE_HUD_COMPONENT_THIS_FRAME(9);
-	UI::HIDE_HUD_COMPONENT_THIS_FRAME(8);
+    UI::HIDE_HUD_COMPONENT_THIS_FRAME(HudComponentVehicleName);
+    UI::HIDE_HUD_COMPONENT_THIS_FRAME(HudComponentAreaName);
+    UI::HIDE_HUD_COMPONENT_THIS_FRAME(HudComponentUnused);
+    UI::HIDE_HUD_COMPONENT_THIS_FRAME(HudComponentStreetName);
+    UI::HIDE_HUD_COMPONENT_THIS_FRAME(HudComponentHelpText);
 
-	for (int i = 0; i <= 2; i++) {
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlNextCamera, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleCinCam, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlCinematicSlowMo, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlPhone, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectCharacterMichael, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectCharacterFranklin, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectCharacterTrevor, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectCharacterMultiplayer, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlCharacterWheel, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlMeleeAttackLight, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlMeleeAttackHeavy, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlMeleeAttackAlternate, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlMap, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlMultiplayerInfo, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlMapPointOfInterest, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlRadioWheelLeftRight, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleNextRadio, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehiclePrevRadio, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlRadioWheelUpDown, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleNextRadioTrack, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehiclePrevRadioTrack, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleRadioWheel, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleDuck, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleSelectNextWeapon, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleSelectPrevWeapon, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleAttack, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleAttack2, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleExit, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectWeapon, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlWeaponWheelNext, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlWeaponWheelPrev, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlNextWeapon, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlPrevWeapon, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectWeapon, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlContext, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlContextSecondary, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSelectWeapon, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleHeadlight, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleRoof, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleHorn, true);
-
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehicleAim, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlVehiclePassengerAim, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlFrontendSocialClub, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlFrontendSocialClubSecondary, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlReplayStartStopRecording, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlInteractionMenu, true);
-		CONTROLS::DISABLE_CONTROL_ACTION(i, ControlSaveReplayClip, true);
-	}
+    // sjaak327
+    // http://gtaforums.com/topic/796908-simple-trainer-for-gtav/?view=findpost&p=1069587144
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlPhone, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlTalk, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlVehicleHeadlight, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlVehicleCinCam, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlVehicleRadioWheel, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlMeleeAttackLight, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlMeleeAttackHeavy, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlMeleeAttackAlternate, true);
+    CONTROLS::DISABLE_CONTROL_ACTION(0, ControlMeleeBlock, true);
 }
 
 void Menu::processMenuNav(std::function<void()> onMain, std::function<void()> onExit) {
@@ -983,11 +1073,7 @@ void Menu::processMenuNav(std::function<void()> onMain, std::function<void()> on
 		CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, controls.ControllerButton1) &&
 		CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, controls.ControllerButton2)) {
 		if (menulevel == 0) {
-			changeMenu("mainmenu");
-			updateScreenSize();
-			if (onMain) {
-				onMain();
-			}
+			OpenMenu();
 		}
 		else {
 			CloseMenu();
@@ -1050,4 +1136,5 @@ void Menu::updateScreenSize() {
 	aspectR = (16.0f / 9.0f)/GRAPHICS::_GET_ASPECT_RATIO(FALSE);
 	menuWidth = menuWidthOriginal*aspectR;
 }
+
 }

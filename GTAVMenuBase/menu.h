@@ -1,10 +1,5 @@
 #pragma once
 
-/*
- * Menu system that was originally from sudomod, but with a bunch of
- * changes to make working with it easier.
- */
-
 #include <string>
 #include <windows.h>
 #include <vector>
@@ -76,7 +71,7 @@ public:
 	 * A menu subtitle. This is optional. If added, this must be added directly
 	 * below the title, before any options are specified.
 	 */
-	void Subtitle(std::string subtitle, bool allcaps = true);
+	void Subtitle(std::string subtitle);
 
 	/*
 	 * Optional: Specify a different background texture for the footer.
@@ -91,6 +86,7 @@ public:
 	 * Returns true on accept.
 	 */
 	bool Option(std::string option, std::vector<std::string> details = {});
+    bool Option(std::string option, Color highlight, std::vector<std::string> details = {});
 
 	/*
 	 * Submenu option.
@@ -105,20 +101,22 @@ public:
 	 * Shows text with extra's specifyable in the detail pane.
 	 * Function pointers can be passed and are called on right, left press.
 	 * Custom pane title can be specified.
-	 * Extra draws image if a line is "!IMG:<file handle>W<height>H<width>".
+	 * Extra draws external image if a line is "!IMG:<file handle>W<height>H<width>".
+	 * Extra draws sprite if a line is "!SPR:D<dict>N<name>W<height>H<width>".
+	 * Extra can be left empty.
+	 * "highlighted" indicates the highlight status of the option. It can be a nullptr.
 	 * Returns true on accept.
-	 */
-	bool OptionPlus(std::string option, std::vector<std::string> &extra,
-					std::function<void()> onRight = nullptr, std::function<void()> onLeft = nullptr, 
-					std::string title = "Info", std::vector<std::string> details = {});
-	/*
-	 * Same as above but with an additional bool ptr for indicating if the option
-	 * is being highlighted. Added back because it's needed by some types of options
-	 * after all. (Menu-assisted keyboard/text input)
 	 */
 	bool OptionPlus(std::string option, std::vector<std::string> &extra, bool *highlighted = nullptr, 
 					std::function<void()> onRight = nullptr, std::function<void()> onLeft = nullptr ,
 					std::string title = "Info", std::vector<std::string> details = {});
+
+	/*
+	 * Can be used to draw the OptionPlus extras separately. Useful when generating
+	 * the extra text is costful or if no other things are needed. Running this when
+	 * OptionPlus is highlighted can improve performance.
+	 */
+	void OptionPlusPlus(std::vector<std::string> &extra, std::string title = "Info");
 
 	/*
 	 * Option that changes an int value with optional custom-sized steps.
@@ -188,6 +186,13 @@ public:
 	void CheckKeys();
 
 	/*
+	 * Opens the menu programmatically and calls onMain.
+	 * Does nothing if the menu is already open.
+	 */
+	void OpenMenu();
+
+
+	/*
 	 * Closes the menu and calls onExit.
 	 */
 	void CloseMenu();
@@ -198,18 +203,24 @@ public:
 	 */
 	const MenuControls &GetControls();
 
-	/*
+    /*
+	 * Returns true if this instance of the menu is open
+	 */
+	bool IsThisOpen();
+
+    /*
 	 * Image prefix string for if you want to show an image in an OptionPlus.
 	 */
 	const std::string ImagePrefix = "!IMG:";
+	const std::string SpritePrefix = "!SPR:";
 
-	// TODO: Refactor into Menu.Settings or provide accessors (r/w).
 	/*
 	 * These should be filled in by MenuSettings.ReadSettings().
 	 */
-	float menuX = 0.000;
+	float menuX = 0.000f;
 	float menuY = 0.000f;
-	
+    std::string cheatString = "";
+
 	Color titleTextColor = solidWhite;
 	Color titleBackgroundColor = solidWhite;
 	int titleFont = 1;
@@ -365,8 +376,11 @@ private:
 	void drawText(const std::string text, int font, float x, float y, float pUnknown, float scale, Color color, int justify);
 	void drawRect(float x, float y, float width, float height, Color color);
 	void drawSprite(std::string textureDict, std::string textureName, float x, float y, float width, float height, float rotation, Color color);
-	void drawAdditionalInfoBoxTitle(std::string title);
-	void drawAdditionalInfoBox(std::vector<std::string> &extra, size_t infoLines, std::string title = "Info");
+	void drawOptionPlusTitle(std::string title);
+    void drawOptionPlusImage(std::string &extra, float &finalHeight);
+    void drawOptionPlusSprite(std::string &extra, float &finalHeight);
+    void drawOptionPlusText(std::string &extra, float &finalHeight);
+    void drawOptionPlusExtras(std::vector<std::string> &extra, std::string title = "Info");
 	void drawMenuDetails(std::vector<std::string> details, float y);
 	void drawOptionValue(std::string printVar, bool highlighted, int max = 0);
 
