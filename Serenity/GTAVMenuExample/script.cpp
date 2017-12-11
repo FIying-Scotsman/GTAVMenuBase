@@ -172,7 +172,7 @@ void update_menu() {
 
 
 		//example:
-		//if(checkBoxStatus)
+		//if(checkBoxStatus) - checkBoxStatus changes state when selected. Could use it with native i.e SET_ENTITY_INVINCIBLE(player, checkBoxStatus);
 			//do stuff
 			//else ...
 
