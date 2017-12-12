@@ -28,6 +28,9 @@
     <ClCompile Include="..\..\GTAVMenuBase\menusettings.cpp">
       <Filter>Menu</Filter>
     </ClCompile>
+    <ClCompile Include="playerMenu.cpp">
+      <Filter>Menu\features\Player</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="script.h" />
@@ -71,6 +74,15 @@
     <ClInclude Include="..\..\GTAVMenuBase\menusettings.h">
       <Filter>Menu</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\GTAVMenuBase\Scaleform.h">
+      <Filter>Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\GTAVMenuBase\InstructionalButton.h">
+      <Filter>Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="playerMenu.h">
+      <Filter>Menu\features\Player</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Menu">
@@ -81,6 +93,12 @@
     </Filter>
     <Filter Include="SDK">
       <UniqueIdentifier>{01012e73-37b7-4874-b66a-9390e9a83264}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Menu\features">
+      <UniqueIdentifier>{73082961-b9dc-42ff-ab69-acb9190a6337}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Menu\features\Player">
+      <UniqueIdentifier>{bb3d081a-1a01-4eee-9fc4-5d8734e882ee}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

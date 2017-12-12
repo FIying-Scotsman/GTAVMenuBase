@@ -41,7 +41,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
@@ -104,6 +104,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)thirdparty\;..\..\GTAVMenuBase\;..\..\ScriptHookV_SDK\</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -157,22 +158,26 @@
     <ClCompile Include="..\..\GTAVMenuBase\menuutils.cpp" />
     <ClCompile Include="keyboard.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="playerMenu.cpp" />
     <ClCompile Include="script.cpp" />
     <ClCompile Include="Util\Logger.cpp" />
     <ClCompile Include="Util\Paths.cpp" />
     <ClCompile Include="Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\GTAVMenuBase\InstructionalButton.h" />
     <ClInclude Include="..\..\GTAVMenuBase\menu.h" />
     <ClInclude Include="..\..\GTAVMenuBase\menucontrols.h" />
     <ClInclude Include="..\..\GTAVMenuBase\menukeyboard.h" />
     <ClInclude Include="..\..\GTAVMenuBase\menusettings.h" />
     <ClInclude Include="..\..\GTAVMenuBase\menuutils.h" />
+    <ClInclude Include="..\..\GTAVMenuBase\Scaleform.h" />
     <ClInclude Include="..\..\ScriptHookV_SDK\inc\enums.h" />
     <ClInclude Include="..\..\ScriptHookV_SDK\inc\main.h" />
     <ClInclude Include="..\..\ScriptHookV_SDK\inc\natives.h" />
     <ClInclude Include="..\..\ScriptHookV_SDK\inc\types.h" />
     <ClInclude Include="keyboard.h" />
+    <ClInclude Include="playerMenu.h" />
     <ClInclude Include="script.h" />
     <ClInclude Include="Util\Logger.hpp" />
     <ClInclude Include="Util\Paths.h" />
