@@ -270,20 +270,20 @@ bool Menu::MenuOption(std::string option, std::string menu, std::vector<std::str
 	if (currentoption <= maxDisplay && optioncount <= maxDisplay) {
 		textDraws.push_back(
 			std::bind(&Menu::drawText, this,
-			">>", optionsFont,
+			"2", 3,
 			menuX + menuWidth / 2.0f - optionRightMargin,
 			indicatorHeight + menuY,
-			optionTextSize, optionTextSize,
+			optionTextSize * 0.75f, optionTextSize * 0.75f,
 			highlighted ? optionsTextSelectColor : optionsTextColor, 2
 			));
 	}
 	else if ((optioncount > (currentoption - maxDisplay)) && optioncount <= currentoption) {
 		textDraws.push_back(
 			std::bind(&Menu::drawText, this,
-			">>", optionsFont,
+			"2", 3,
 			menuX + menuWidth / 2.0f - optionRightMargin,
 			menuY + headerHeight + (optioncount - (currentoption - maxDisplay + 1)) * optionHeight,
-			optionTextSize, optionTextSize,
+            optionTextSize * 0.75f, optionTextSize * 0.75f,
 			highlighted ? optionsTextSelectColor : optionsTextColor, 2
 		));
 	}
@@ -366,7 +366,7 @@ bool Menu::BoolOption(std::string option, bool &var, std::vector<std::string> de
 	
 	char *tickBoxTexture;
 	Color optionColors = optionsTextColor;
-	float boxSz = 0.05f;
+	float boxSz = 0.0475f;
 
 	if (highlighted) {
 		tickBoxTexture = var ? "shop_box_tickb" : "shop_box_blankb";
@@ -380,11 +380,11 @@ bool Menu::BoolOption(std::string option, bool &var, std::vector<std::string> de
 	
 	if (currentoption <= maxDisplay && optioncount <= maxDisplay) {
 		doDraw = true;
-		textureY = (indicatorHeight + (menuY + 0.016f));
+		textureY = (indicatorHeight + (menuY + 0.0175f));
 	}
 	else if ((optioncount > (currentoption - maxDisplay)) && optioncount <= currentoption) {
 		doDraw = true;
-		textureY = menuY + headerHeight + (optioncount - (currentoption - maxDisplay + 1)) * optionHeight + 0.016f;
+		textureY = menuY + headerHeight + (optioncount - (currentoption - maxDisplay + 1)) * optionHeight + 0.0175f;
 	}
 
 	if (doDraw) {
@@ -715,18 +715,18 @@ std::vector<std::string> Menu::splitString(float maxWidth, std::string &details,
 	std::vector<std::string> words = split(details, ' ');
 
 	std::string line;
-	for (std::string word : words) {
-		float lineWidth = getStringWidth(line, scale, font);
-		float wordWidth = getStringWidth(word, scale, font);
-		if (lineWidth + wordWidth > maxWidth) {
-			splitLines.push_back(line);
-			line.clear();
-		}
-		line += word + ' ';
-		if (word == words.back()) {
-			splitLines.push_back(line);
-		}
-	}
+    for (auto it = words.begin(); it != words.end(); ++it) {
+        float lineWidth = getStringWidth(line, scale, font);
+        float wordWidth = getStringWidth(*it, scale, font);
+        if (lineWidth + wordWidth > maxWidth) {
+            splitLines.push_back(line);
+            line.clear();
+        }
+        line += *it + ' ';
+        if (std::next(it) == words.end()) {
+            splitLines.push_back(line);
+        }
+    }
 
 	return splitLines;
 }
